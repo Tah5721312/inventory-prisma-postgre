@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "eslint src --fix && pnpm format",
@@ -14,6 +14,7 @@
     "test": "jest",
     "format": "prettier -w .",
     "format:check": "prettier -c .",
+    "postinstall": "prisma generate",
     "postbuild": "next-sitemap --config next-sitemap.config.js",
     "prepare": "husky install",
     "db:generate": "prisma generate",
