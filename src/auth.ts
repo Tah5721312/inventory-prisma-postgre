@@ -55,6 +55,9 @@ export const {
         }
 
         try {
+          // التحقق من الاتصال بقاعدة البيانات أولاً
+          await prisma.$connect();
+          
           const user = await prisma.user.findFirst({
             where: {
               email: {
@@ -75,6 +78,24 @@ export const {
           
           if (!user) {
             console.log(`❌ User not found or inactive: ${email}`);
+            // محاولة البحث بدون شرط isActive للتحقق
+            const inactiveUser = await prisma.user.findFirst({
+              where: {
+                email: {
+                  equals: email,
+                  mode: 'insensitive',
+                },
+              },
+              select: {
+                userId: true,
+                username: true,
+                email: true,
+                isActive: true,
+              },
+            });
+            if (inactiveUser) {
+              console.log(`⚠️ User found but inactive: ${email}, isActive: ${inactiveUser.isActive}`);
+            }
             return null;
           }
 
@@ -98,8 +119,12 @@ export const {
           return userSession as any;
 
         } catch (err: any) {
-          // تسجيل الأخطاء فقط في حالة وجود مشكلة فعلية
-          console.error("❌ Authorization error:", err.message);
+          // تسجيل الأخطاء بشكل مفصل
+          console.error("❌ Authorization error:", {
+            message: err.message,
+            stack: err.stack,
+            name: err.name,
+          });
           return null;
         }
       },
