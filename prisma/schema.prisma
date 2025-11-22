@@ -1,0 +1,265 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===============================================
+// 1. الجداول المرجعية الأساسية
+// ===============================================
+
+model Role {
+  roleId        Int      @id @default(autoincrement()) @map("ROLE_ID")
+  name          String   @unique @db.VarChar(50) @map("NAME")
+  description   String?  @db.VarChar(255) @map("DESCRIPTION")
+  isActive      Boolean  @default(true) @map("IS_ACTIVE")
+  createdAt     DateTime @default(now()) @map("CREATED_AT")
+  updatedAt     DateTime @updatedAt @map("UPDATED_AT")
+
+  users         User[]
+  permissions   RolePermission[]
+
+  @@map("ROLES")
+}
+
+model Department {
+  deptId    Int      @id @default(autoincrement()) @map("DEPT_ID")
+  deptName  String   @unique @db.VarChar(200) @map("DEPT_NAME")
+  createdAt DateTime @default(now()) @map("CREATED_AT")
+
+  users     User[]
+  items     Item[]
+  movementsFrom InventoryMovement[] @relation("FromDepartment")
+  movementsTo   InventoryMovement[] @relation("ToDepartment")
+
+  @@map("DEPARTMENTS")
+}
+
+model Rank {
+  rankId    Int      @id @default(autoincrement()) @map("RANK_ID")
+  rankName  String   @unique @db.VarChar(100) @map("RANK_NAME")
+  createdAt DateTime @default(now()) @map("CREATED_AT")
+
+  users     User[]
+
+  @@map("RANKS")
+}
+
+model Floor {
+  floorId   Int      @id @default(autoincrement()) @map("FLOOR_ID")
+  floorName String   @unique @db.VarChar(100) @map("FLOOR_NAME")
+  createdAt DateTime @default(now()) @map("CREATED_AT")
+
+  users     User[]
+  items     Item[]
+  movementsFrom InventoryMovement[] @relation("FromFloor")
+  movementsTo   InventoryMovement[] @relation("ToFloor")
+
+  @@map("FLOORS")
+}
+
+// ===============================================
+// 2. جدول المستخدمين
+// ===============================================
+
+model User {
+  userId    Int       @id @default(autoincrement()) @map("USER_ID")
+  username  String    @unique @db.VarChar(100) @map("USERNAME")
+  email     String    @unique @db.VarChar(255) @map("EMAIL")
+  password  String    @db.VarChar(255) @map("PASSWORD")
+  roleId    Int       @map("ROLE_ID")
+  fullName  String?   @db.VarChar(200) @map("FULL_NAME")
+  isAdmin   Boolean   @default(false) @map("IS_ADMIN")
+  phone     String?   @db.VarChar(20) @map("PHONE")
+  isActive  Boolean   @default(true) @map("IS_ACTIVE")
+  rankId    Int?      @map("RANK_ID")
+  deptId    Int?      @map("DEPT_ID")
+  floorId   Int?      @map("FLOOR_ID")
+  createdAt DateTime  @default(now()) @map("CREATED_AT")
+  updatedAt DateTime  @updatedAt @map("UPDATED_AT")
+
+  role      Role      @relation(fields: [roleId], references: [roleId], onDelete: SetNull)
+  rank      Rank?     @relation(fields: [rankId], references: [rankId], onDelete: SetNull)
+  department Department? @relation(fields: [deptId], references: [deptId], onDelete: SetNull)
+  floor     Floor?    @relation(fields: [floorId], references: [floorId], onDelete: SetNull)
+
+  items     Item[]
+  movements InventoryMovement[]
+
+  @@index([roleId])
+  @@index([rankId])
+  @@index([deptId])
+  @@index([floorId])
+  @@index([email])
+  @@index([isActive])
+  @@map("USERS")
+}
+
+// ===============================================
+// 3. جدول صلاحيات الأدوار
+// ===============================================
+
+model RolePermission {
+  rolePermissionsId Int     @id @default(autoincrement()) @map("ROLE_PERMISSIONS_ID")
+  roleId            Int     @map("ROLE_ID")
+  subject           String  @db.VarChar(50) @map("SUBJECT")
+  action            String  @db.VarChar(50) @map("ACTION")
+  fieldName         String? @db.VarChar(100) @map("FIELD_NAME")
+  canAccess         Boolean @default(true) @map("CAN_ACCESS")
+  createdAt         DateTime @default(now()) @map("CREATED_AT")
+
+  role              Role    @relation(fields: [roleId], references: [roleId], onDelete: Cascade)
+
+  @@unique([roleId, subject, action, fieldName])
+  @@map("ROLE_PERMISSIONS")
+}
+
+// ===============================================
+// 4. جداول التصنيفات (Categories Hierarchy)
+// ===============================================
+
+model MainCategory {
+  catId       Int      @id @default(autoincrement()) @map("CAT_ID")
+  catName     String   @unique @db.VarChar(200) @map("CAT_NAME")
+  description String?  @db.VarChar(500) @map("DESCRIPTION")
+  createdAt   DateTime @default(now()) @map("CREATED_AT")
+
+  subCategories SubCategory[]
+
+  @@map("MAIN_CATEGORIES")
+}
+
+model SubCategory {
+  subCatId    Int      @id @default(autoincrement()) @map("SUB_CAT_ID")
+  subCatName  String   @db.VarChar(200) @map("SUB_CAT_NAME")
+  catId       Int      @map("CAT_ID")
+  description String?  @db.VarChar(500) @map("DESCRIPTION")
+  createdAt   DateTime @default(now()) @map("CREATED_AT")
+
+  mainCategory MainCategory @relation(fields: [catId], references: [catId], onDelete: Cascade)
+  itemTypes     ItemType[]
+  items         Item[]
+
+  @@unique([subCatName, catId])
+  @@index([catId])
+  @@map("SUB_CATEGORIES")
+}
+
+model ItemType {
+  itemTypeId   Int      @id @default(autoincrement()) @map("ITEM_TYPE_ID")
+  itemTypeName String   @unique @db.VarChar(200) @map("ITEM_TYPE_NAME")
+  subCatId     Int      @map("SUB_CAT_ID")
+  createdAt    DateTime @default(now()) @map("CREATED_AT")
+
+  subCategory SubCategory @relation(fields: [subCatId], references: [subCatId], onDelete: Cascade)
+  items       Item[]
+
+  @@index([subCatId])
+  @@map("ITEM_TYPES")
+}
+
+// ===============================================
+// 5. جدول الأصناف الرئيسي
+// ===============================================
+
+model Item {
+  itemId      Int      @id @default(autoincrement()) @map("ITEM_ID")
+  itemName    String   @db.VarChar(300) @map("ITEM_NAME")
+  subCatId    Int?     @map("SUB_CAT_ID")
+  itemTypeId  Int?     @map("ITEM_TYPE_ID")
+  lockNum     Int?     @map("LOCK_NUM")
+  serial      String?  @db.VarChar(100) @map("SERIAL")
+  kind        String?  @db.VarChar(100) @map("KIND")
+  situation   String?  @db.VarChar(200) @map("SITUATION")
+  properties  String?  @db.VarChar(400) @map("PROPERTIES")
+  hdd         String?  @db.VarChar(100) @map("HDD")
+  ram         String?  @db.VarChar(100) @map("RAM")
+  ip          String?  @db.VarChar(50) @map("IP")
+  compName    String?  @db.VarChar(200) @map("COMP_NAME")
+  userId      Int?     @map("USER_ID")
+  deptId      Int?     @map("DEPT_ID")
+  floorId     Int?     @map("FLOOR_ID")
+  quantity    Int      @default(0) @map("QUANTITY")
+  minQuantity Int      @default(0) @map("MIN_QUANTITY")
+  unit        String   @default("قطعة") @db.VarChar(50) @map("UNIT")
+  createdAt   DateTime @default(now()) @map("CREATED_AT")
+  updatedAt   DateTime @updatedAt @map("UPDATED_AT")
+
+  subCategory SubCategory? @relation(fields: [subCatId], references: [subCatId], onDelete: SetNull)
+  itemType    ItemType?    @relation(fields: [itemTypeId], references: [itemTypeId], onDelete: SetNull)
+  user        User?        @relation(fields: [userId], references: [userId], onDelete: SetNull)
+  department  Department?  @relation(fields: [deptId], references: [deptId], onDelete: SetNull)
+  floor       Floor?       @relation(fields: [floorId], references: [floorId], onDelete: SetNull)
+
+  movements   InventoryMovement[]
+
+  @@index([subCatId])
+  @@index([itemTypeId])
+  @@index([userId])
+  @@index([deptId])
+  @@index([floorId])
+  @@index([serial])
+  @@index([ip])
+  @@map("ITEMS")
+}
+
+// ===============================================
+// 6. جدول أنواع الحركات
+// ===============================================
+
+model MovementType {
+  movementTypeId Int      @id @default(autoincrement()) @map("MOVEMENT_TYPE_ID")
+  typeName        String   @unique @db.VarChar(100) @map("TYPE_NAME")
+  typeCode        String   @unique @db.VarChar(20) @map("TYPE_CODE")
+  effect          Int      @map("EFFECT") // 1 للزيادة، -1 للنقصان، 0 للتعديل
+  description     String?  @db.VarChar(500) @map("DESCRIPTION")
+  isActive        Boolean  @default(true) @map("IS_ACTIVE")
+  createdAt       DateTime @default(now()) @map("CREATED_AT")
+
+  movements       InventoryMovement[]
+
+  @@map("MOVEMENT_TYPES")
+}
+
+// ===============================================
+// 7. جدول حركات المخزون
+// ===============================================
+
+model InventoryMovement {
+  movementId    Int       @id @default(autoincrement()) @map("MOVEMENT_ID")
+  itemId        Int       @map("ITEM_ID")
+  movementTypeId Int      @map("MOVEMENT_TYPE_ID")
+  quantity      Int       @map("QUANTITY")
+  previousQty   Int?      @map("PREVIOUS_QTY")
+  newQty        Int?      @map("NEW_QTY")
+  movementDate  DateTime  @default(now()) @map("MOVEMENT_DATE")
+  userId        Int       @map("USER_ID")
+  fromDeptId    Int?      @map("FROM_DEPT_ID")
+  toDeptId      Int?      @map("TO_DEPT_ID")
+  fromFloorId   Int?      @map("FROM_FLOOR_ID")
+  toFloorId     Int?      @map("TO_FLOOR_ID")
+  referenceNo   String?  @db.VarChar(100) @map("REFERENCE_NO")
+  notes         String?  @db.VarChar(500) @map("NOTES")
+  createdAt     DateTime  @default(now()) @map("CREATED_AT")
+
+  item          Item      @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+  movementType  MovementType @relation(fields: [movementTypeId], references: [movementTypeId])
+  user          User      @relation(fields: [userId], references: [userId])
+  fromDepartment Department? @relation("FromDepartment", fields: [fromDeptId], references: [deptId], onDelete: SetNull)
+  toDepartment  Department? @relation("ToDepartment", fields: [toDeptId], references: [deptId], onDelete: SetNull)
+  fromFloor     Floor?    @relation("FromFloor", fields: [fromFloorId], references: [floorId], onDelete: SetNull)
+  toFloor       Floor?    @relation("ToFloor", fields: [toFloorId], references: [floorId], onDelete: SetNull)
+
+  @@index([itemId])
+  @@index([movementDate])
+  @@index([movementTypeId])
+  @@index([userId])
+  @@map("INVENTORY_MOVEMENTS")
+}
+

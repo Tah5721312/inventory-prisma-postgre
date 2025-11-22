@@ -1,0 +1,28 @@
+import { z } from 'zod';
+
+
+// Register Schema
+export const registerSchema = z.object({
+    username: z.string().min(2).max(100), //.optional(),
+    email: z.string().min(3).max(200).email(),
+    password: z.string().min(6),
+});
+
+// Login Schema
+export const loginSchema = z.object({
+    email: z.string().min(3).max(200).email(),
+    password: z.string().min(4),
+});
+
+// Create Comment Schema
+export const createCommentShema = z.object({
+    text: z.string().min(2).max(500),
+    articleId: z.number(),
+});
+
+// Update User Profile Schema
+export const updateUserSchema = z.object({
+    username: z.string().min(2).max(100).optional(),
+    email: z.string().min(3).max(200).email().optional(),
+    password: z.string().min(6).optional(),
+});
